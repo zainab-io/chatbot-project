@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Chatbot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">AI Chatbot 🤖</div>
+
+    <div class="chat-box" id="chat-box"></div>
+
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="Type or speak..." onkeypress="handleKey(event)">
+        <button onclick="sendMessage()">Send</button>
+        <button onclick="startVoice()">🎤</button>
+    </div>
+</div>
+
+<script>
+// Handle Enter key
+function handleKey(e){
+    if(e.key === "Enter") sendMessage();
+}
+
+// Send message
+function sendMessage() {
+    let input = document.getElementById("user-input");
+    let message = input.value.trim();
+    if(message === "") return;
+
+    let chatBox = document.getElementById("chat-box");
+
+    addMessage(message, "user");
+
+    let typing = addMessage("Typing...", "bot");
+
+    fetch("/get", {
+        method: "POST",
+        body: new URLSearchParams({ msg: message }),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }
+    })
+    .then(res => res.json())
+    .then(data => {
+        typing.remove();
+        typeEffect(data.response);
+    })
+    .catch(() => {
+        typing.innerText = "Error connecting to server ❌";
+    });
+
+    input.value = "";
+}
+
+// Typing animation
+function typeEffect(text){
+    let chatBox = document.getElementById("chat-box");
+    let div = document.createElement("div");
+    div.className = "bot-message";
+    chatBox.appendChild(div);
+
+    let i = 0;
+
+    function typing(){
+        if(i < text.length){
+            div.innerHTML += text.charAt(i);
+            i++;
+            setTimeout(typing, 15);
+        }
+    }
+    typing();
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// Add message to chat
+function addMessage(text, type){
+    let chatBox = document.getElementById("chat-box");
+    let div = document.createElement("div");
+
+    div.className = type === "user" ? "user-message" : "bot-message";
+    div.innerText = text;
+
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    return div;
+}
+
+// 🎤 Voice Input (Improved)
+function startVoice() {
+    if (!('webkitSpeechRecognition' in window)) {
+        alert("Voice recognition not supported in this browser ❌");
+        return;
+    }
+
+    const recognition = new webkitSpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+
+    let chatBox = document.getElementById("chat-box");
+
+    // Show listening message
+    let listening = addMessage("🎤 Listening...", "bot");
+
+    recognition.onresult = function(event) {
+        const text = event.results[0][0].transcript;
+
+        listening.remove();
+
+        document.getElementById("user-input").value = text;
+
+        // Auto send after voice input
+        sendMessage();
+    };
+
+    recognition.onerror = function(event) {
+        listening.innerText = "Voice error: " + event.error + " ❌";
+    };
+
+    recognition.onend = function() {
+        console.log("Voice ended");
+    };
+
+    recognition.start();
+}
+</script>
+
+</body>
+</html>
